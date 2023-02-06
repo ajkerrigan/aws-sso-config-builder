@@ -32,9 +32,9 @@ dependencies = [
 dynamic = ["version"]
 
 [project.urls]
-Documentation = "https://github.com/unknown/aws-sso-config-builder#readme"
-Issues = "https://github.com/unknown/aws-sso-config-builder/issues"
-Source = "https://github.com/unknown/aws-sso-config-builder"
+Documentation = "https://github.com/ajkerrigan/aws-sso-config-builder#readme"
+Issues = "https://github.com/ajkerrigan/aws-sso-config-builder/issues"
+Source = "https://github.com/ajkerrigan/aws-sso-config-builder"
 
 [project.scripts]
 generate-sso-profiles = "aws_sso_config_builder.gen_config:cli"
