@@ -23,13 +23,21 @@ classifiers = [
   "Programming Language :: Python :: Implementation :: CPython",
   "Programming Language :: Python :: Implementation :: PyPy",
 ]
-dependencies = []
+dependencies = [
+  "boto3",
+  "click",
+  "keyring",
+  "rich"
+]
 dynamic = ["version"]
 
 [project.urls]
 Documentation = "https://github.com/unknown/aws-sso-config-builder#readme"
 Issues = "https://github.com/unknown/aws-sso-config-builder/issues"
 Source = "https://github.com/unknown/aws-sso-config-builder"
+
+[project.scripts]
+generate-sso-profiles = "aws_sso_config_builder.gen_config:cli"
 
 [tool.hatch.version]
 path = "aws_sso_config_builder/__about__.py"
