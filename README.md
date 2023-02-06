@@ -11,6 +11,7 @@
 - [Why?](#why)
 - [Installation](#installation)
 - [Usage](#usage)
+- [Extras](#extras)
 - [License](#license)
 
 ## The Gist
@@ -197,6 +198,17 @@ cog -r ~/.aws/config
 
 Note that this depends on having Cog and aws-sso-config-builder installed in the same Python
 environment. See also [Installation with Pipx Alongside Cog](#with-pipx-alongside-cog) above.
+
+## Extras
+
+### Fish Convenience Functions
+
+These are probably specific to my environment, but sharing them because someone else might find them useful.
+
+I use a fish convenience function ([asp](./extras/fish/functions/asp.fish)) to search or switch among AWS profiles. I'm reasonably sure that it was inspired at some point by a function of the same name in the [aws plugin for oh-my-zsh](https://github.com/ohmyzsh/ohmyzsh/blob/master/plugins/aws/aws.plugin.zsh).
+
+Invoking `asp` with no arguments opens an [fzf](https://github.com/junegunn/fzf/) search of available profiles. But the command also supports tab completion with [this completion script](./extras/fish/completions/asp.fish).
+
 
 ## License
 
