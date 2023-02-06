@@ -30,6 +30,7 @@ If they:
 
 - Have access to a large or shifting set of accounts and roles through AWS SSO
 - Don't already have tools in place to generate and maintain their named profiles
+  - There are a few of these, I remember [aws-sso-util](https://github.com/benkehoe/aws-sso-util) in particular
 - Want to automatically generate/regenerate templatized blocks without interfering with manually-defined sections
 
 ### ...did I publish this?
