@@ -1,4 +1,4 @@
-# AWS SSO Config Builder
+# AWS SSO Config Builder <!-- omit in toc -->
 
 [![PyPI - Version](https://img.shields.io/pypi/v/aws-sso-config-builder.svg)](https://pypi.org/project/aws-sso-config-builder)
 [![PyPI - Python Version](https://img.shields.io/pypi/pyversions/aws-sso-config-builder.svg)](https://pypi.org/project/aws-sso-config-builder)
@@ -8,10 +8,23 @@
 **Table of Contents**
 
 - [The Gist](#the-gist)
-- [Why?](#why)
+- [Why](#why)
+  - [...would someone use this?](#would-someone-use-this)
+  - [...did I publish this?](#did-i-publish-this)
+  - [...the focus on aws-vault?](#the-focus-on-aws-vault)
 - [Installation](#installation)
+  - [Into the Active Python Environment](#into-the-active-python-environment)
+  - [With Pipx](#with-pipx)
+  - [With Pipx Alongside Cog](#with-pipx-alongside-cog)
 - [Usage](#usage)
+  - [CLI](#cli)
+    - [Quickstart with Defaults](#quickstart-with-defaults)
+    - [More Options](#more-options)
+  - [Python](#python)
+    - [Quickstart with Defaults](#quickstart-with-defaults-1)
+    - [Usage with Cog](#usage-with-cog)
 - [Extras](#extras)
+  - [Fish Convenience Functions](#fish-convenience-functions)
 - [License](#license)
 
 ## The Gist
