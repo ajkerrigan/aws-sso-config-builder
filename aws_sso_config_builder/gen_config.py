@@ -17,8 +17,6 @@ from rich.console import Console
 from rich.progress import BarColumn, Progress, TaskProgressColumn, TextColumn
 from rich.table import Column
 
-sess = boto3.Session(region_name="us-east-1")
-
 DEFAULT_PROFILE_TEMPLATE = """
     [profile {profile_name}]
     sso_session = {sso_session}
