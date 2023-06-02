@@ -6,6 +6,7 @@ import textwrap
 import time
 import webbrowser
 from collections import ChainMap
+from datetime import datetime, timedelta
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from operator import itemgetter
 
@@ -31,29 +32,64 @@ SSO_SESSION_BLOCK = """
 """
 
 
+def validate_id_client(id_client):
+    log = logging.getLogger("validate_id_client")
+
+    if not id_client:
+        log.info("No cached ID client found")
+        return False
+
+    required_keys = {"clientId", "clientSecret", "clientSecretExpiresAt"}
+    if not required_keys.issubset(id_client):
+        log.info(
+            "Cached ID client missing required keys. Expected: %s, Got: %s"
+            % (required_keys, set(id_client))
+        )
+        return False
+
+    try:
+        secret_expires = datetime.fromtimestamp(id_client["clientSecretExpiresAt"])
+        return secret_expires > (datetime.now() + timedelta(minutes=5))
+    except (TypeError, OverflowError):
+        return False
+
+
 def register_id_client(oidc_client):
     log = logging.getLogger("register_id_client")
     keyring_service, keyring_username = "aws-sso-oidc", "sso-config-generator"
-    id_client = keyring.get_password(keyring_service, keyring_username)
-    if not id_client:
-        log.info("No cached ID client found, registering a new one...")
-        id_client = {
-            k: v
-            for k, v in oidc_client.register_client(
-                clientName=keyring_username, clientType="public"
-            ).items()
-            if k in {"clientId", "clientSecret"}
-        }
-        keyring.set_password(keyring_service, keyring_username, json.dumps(id_client))
+    saved_client = keyring.get_password(keyring_service, keyring_username)
+    id_client = saved_client and json.loads(saved_client)
+    if not validate_id_client(id_client):
+        log.info("Registering a new ID client")
+        id_client = oidc_client.register_client(
+            clientName=keyring_username, clientType="public"
+        )
+        keyring.set_password(
+            keyring_service,
+            keyring_username,
+            json.dumps(
+                {
+                    k: id_client[k]
+                    for k in {
+                        "clientId",
+                        "clientSecret",
+                        "clientSecretExpiresAt",
+                        "clientIdIssuedAt",
+                    }
+                }
+            ),
+        )
     else:
-        log.info("Using cached ID client...")
-        id_client = json.loads(id_client)
+        log.info("Using cached ID client")
+
     return id_client
 
 
 def create_access_token(oidc_client, id_client, sso_start_url):
     device_auth = oidc_client.start_device_authorization(
-        **id_client, startUrl=sso_start_url
+        clientId=id_client["clientId"],
+        clientSecret=id_client["clientSecret"],
+        startUrl=sso_start_url,
     )
     webbrowser.open_new_tab(device_auth["verificationUriComplete"])
 
@@ -64,7 +100,8 @@ def create_access_token(oidc_client, id_client, sso_start_url):
         while not progress.finished:
             try:
                 access_token = oidc_client.create_token(
-                    **id_client,
+                    clientId=id_client["clientId"],
+                    clientSecret=id_client["clientSecret"],
                     grantType="urn:ietf:params:oauth:grant-type:device_code",
                     deviceCode=device_auth["deviceCode"],
                 )["accessToken"]
