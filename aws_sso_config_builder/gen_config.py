@@ -143,7 +143,7 @@ def list_account_roles(sso_client, access_token, accounts):
     account_roles = {}
     with progress:
         task = progress.add_task("Listing roles for accounts...", total=len(accounts))
-        with ThreadPoolExecutor() as executor:
+        with ThreadPoolExecutor(max_workers=4) as executor:
             futures = [
                 executor.submit(get_roles, account, sso_client, access_token)
                 for account in accounts
