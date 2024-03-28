@@ -59,7 +59,7 @@ From the user experience perspective, the biggest win is that when using my aws-
 - If I don't have an active SSO session, it pops open a browser to login without me having to manually type `aws sso login`
 - If my session credentials are missing or expired, aws-vault refreshes them behind the scenes without killing running commands
 
-But to be fair, a lot of wy I use aws-vault is habit. If you're not already using it, I'm not here to sell it to you.
+But to be fair, a lot of why I use aws-vault is habit. If you're not already using it, I'm not here to sell it to you.
 
 ## Installation
 
