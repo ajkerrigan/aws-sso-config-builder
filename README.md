@@ -185,18 +185,15 @@ Add this Cog block to a new or existing `~/.aws/config` file:
 #         sso_role_name = {role_name}
 #         output = json
 #         region = us-east-2
-#         cli_history = enabled
 #
 #         [profile {profile_name}]
 #         credential_process = {aws_vault_path} exec --json {profile_name}-sso
 #         output = json
 #         region = us-east-2
-#         cli_history = enabled
 #     """,
 #     regex_replacements={
-#         "speckledmonkey": "sm",
-#         "^Customer": "cust",
-#         "Sandbox-": "sbx-"
+#         "Production": "prod",
+#         "Sandbox": "sbx"
 #     },
 #     aws_vault_path="/home/aj/go/bin/aws-vault",
 # ))
