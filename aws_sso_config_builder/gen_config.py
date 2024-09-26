@@ -6,8 +6,8 @@ import textwrap
 import time
 import webbrowser
 from collections import ChainMap
-from datetime import datetime, timedelta
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import UTC, datetime, timedelta
 from operator import itemgetter
 
 import boto3
@@ -31,6 +31,9 @@ SSO_SESSION_BLOCK = """
     sso_region = us-east-1
 """
 
+VALIDATION_FAIL_EXTRAS = "Expected values in the form 'key=value', got: '{value}'"
+VALIDATION_FAIL_REPLACEMENTS = "Expected values in the form 'pattern,replacement', got: '{value}'"
+
 
 def validate_id_client(id_client):
     log = logging.getLogger("validate_id_client")
@@ -40,16 +43,17 @@ def validate_id_client(id_client):
         return False
 
     required_keys = {"clientId", "clientSecret", "clientSecretExpiresAt"}
-    if not required_keys.issubset(id_client):
+    cached_keys = set(id_client)
+    if not required_keys.issubset(cached_keys):
         log.info(
-            "Cached ID client missing required keys. Expected: %s, Got: %s"
-            % (required_keys, set(id_client))
+            "Cached ID client missing required keys",
+            extra={"expected": required_keys, "got": cached_keys},
         )
         return False
 
     try:
-        secret_expires = datetime.fromtimestamp(id_client["clientSecretExpiresAt"])
-        return secret_expires > (datetime.now() + timedelta(minutes=5))
+        secret_expires = datetime.fromtimestamp(id_client["clientSecretExpiresAt"], UTC)
+        return secret_expires > (datetime.now(UTC) + timedelta(minutes=5))
     except (TypeError, OverflowError):
         return False
 
@@ -61,21 +65,19 @@ def register_id_client(oidc_client):
     id_client = saved_client and json.loads(saved_client)
     if not validate_id_client(id_client):
         log.info("Registering a new ID client")
-        id_client = oidc_client.register_client(
-            clientName=keyring_username, clientType="public"
-        )
+        id_client = oidc_client.register_client(clientName=keyring_username, clientType="public")
         keyring.set_password(
             keyring_service,
             keyring_username,
             json.dumps(
                 {
                     k: id_client[k]
-                    for k in {
+                    for k in (
                         "clientId",
                         "clientSecret",
                         "clientSecretExpiresAt",
                         "clientIdIssuedAt",
-                    }
+                    )
                 }
             ),
         )
@@ -94,9 +96,7 @@ def create_access_token(oidc_client, id_client, sso_start_url):
     webbrowser.open_new_tab(device_auth["verificationUriComplete"])
 
     with progress:
-        auth_task = progress.add_task(
-            f"Waiting for device authorization...", total=None
-        )
+        auth_task = progress.add_task("Waiting for device authorization...", total=None)
         while not progress.finished:
             try:
                 access_token = oidc_client.create_token(
@@ -117,11 +117,7 @@ def list_accounts(sso_client, access_token):
         list_accounts_task = progress.add_task("Listing accounts...", total=None)
 
         paginator = sso_client.get_paginator("list_accounts")
-        accounts = [
-            acc
-            for page in paginator.paginate(accessToken=access_token)
-            for acc in page["accountList"]
-        ]
+        accounts = [acc for page in paginator.paginate(accessToken=access_token) for acc in page["accountList"]]
         progress.update(list_accounts_task, total=100, completed=100)
     return accounts
 
@@ -131,9 +127,7 @@ def get_roles(account, sso_client, access_token):
     return {
         account["accountName"]: [
             role
-            for page in paginator.paginate(
-                accessToken=access_token, accountId=account["accountId"]
-            )
+            for page in paginator.paginate(accessToken=access_token, accountId=account["accountId"])
             for role in page["roleList"]
         ]
     }
@@ -144,10 +138,7 @@ def list_account_roles(sso_client, access_token, accounts):
     with progress:
         task = progress.add_task("Listing roles for accounts...", total=len(accounts))
         with ThreadPoolExecutor(max_workers=4) as executor:
-            futures = [
-                executor.submit(get_roles, account, sso_client, access_token)
-                for account in accounts
-            ]
+            futures = [executor.submit(get_roles, account, sso_client, access_token) for account in accounts]
 
             for future in as_completed(futures):
                 account_roles.update(future.result())
@@ -157,14 +148,14 @@ def list_account_roles(sso_client, access_token, accounts):
 
 def munge_profile_name(account_name, role_name, regex_replacements):
     replacements = ChainMap(
-        regex_replacements,
+        regex_replacements or {},
         {
             "_": "-",
             " ": "-",
         },
     )
 
-    profile_name = "-".join((account_name, role_name))
+    profile_name = f"{account_name}-{role_name}"
     for old, new in replacements.items():
         profile_name = re.sub(old, new, profile_name)
 
@@ -172,11 +163,9 @@ def munge_profile_name(account_name, role_name, regex_replacements):
 
 
 def build_config_profiles(account_roles, regex_replacements):
-    profiles = [
+    return [
         {
-            "name": munge_profile_name(
-                account_name, role["roleName"], regex_replacements
-            ),
+            "name": munge_profile_name(account_name, role["roleName"], regex_replacements),
             "account_name": account_name,
             "role_name": role["roleName"],
             "account_id": role["accountId"],
@@ -184,7 +173,6 @@ def build_config_profiles(account_roles, regex_replacements):
         for account_name in sorted(account_roles)
         for role in sorted(account_roles[account_name], key=itemgetter("roleName"))
     ]
-    return profiles
 
 
 def format_profile(template, profile, sso_session_name, **extra_vars):
@@ -203,14 +191,12 @@ def format_profile(template, profile, sso_session_name, **extra_vars):
 def generate_config_blocks(
     sso_directories,
     profile_template=DEFAULT_PROFILE_TEMPLATE,
-    regex_replacements={},
+    regex_replacements=None,
     **extra_vars,
 ):
     sess = boto3.Session(region_name="us-east-1")
     oidc_client = sess.client("sso-oidc")
-    sso_client = sess.client(
-        "sso", config=Config(retries={"mode": "standard", "max_attempts": 10})
-    )
+    sso_client = sess.client("sso", config=Config(retries={"mode": "standard", "max_attempts": 10}))
     id_client = register_id_client(oidc_client)
     config_blocks = []
 
@@ -222,11 +208,7 @@ def generate_config_blocks(
         profiles = build_config_profiles(account_roles, regex_replacements)
 
         config_blocks.append(
-            textwrap.dedent(
-                SSO_SESSION_BLOCK.format(
-                    sso_session_name=sso_directory, sso_start_url=sso_start_url
-                )
-            )
+            textwrap.dedent(SSO_SESSION_BLOCK.format(sso_session_name=sso_directory, sso_start_url=sso_start_url))
         )
         config_blocks.extend(
             [
@@ -243,27 +225,21 @@ def generate_config_blocks(
     return "".join(config_blocks)
 
 
-def validate_extras(ctx, param, value):
-    split_values = [v.split("=") for v in value]
-    if any(len(v) != 2 for v in split_values):
-        raise click.BadParameter(
-            "Extra vars must be key/value pairs in the form: key=value"
-        )
-    return dict(split_values)
+def validate_extras(ctx, param, value):  # noqa: ARG001
+    for v in value:
+        if v.count("=") != 1:
+            raise click.BadParameter(VALIDATION_FAIL_EXTRAS.format(value=v))
+    return dict(v.split("=") for v in value)
 
 
-def validate_replacements(ctx, param, value):
-    split_values = [v.split(",") for v in value]
-    if any(len(v) != 2 for v in split_values):
-        raise click.BadParameter(
-            "Replacements must be strings in the form: pattern,replacement"
-        )
-    return dict(split_values)
+def validate_replacements(ctx, param, value):  # noqa: ARG001
+    for v in value:
+        if v.count(",") != 1:
+            raise click.BadParameter(VALIDATION_FAIL_REPLACEMENTS.format(value=v))
+    return dict(v.split(",") for v in value)
 
 
-@click.command(
-    context_settings=dict(help_option_names=["-h", "--help"]), no_args_is_help=True
-)
+@click.command(context_settings={"help_option_names": ["-h", "--help"]}, no_args_is_help=True)
 @click.option(
     "--sso-directories",
     "-s",
@@ -315,10 +291,8 @@ def validate_replacements(ctx, param, value):
 def cli(sso_directories, profile_template, regex_replacements, extra_vars):
     logging.basicConfig(level=logging.INFO)
 
-    print(
-        generate_config_blocks(
-            sso_directories, profile_template, regex_replacements, **extra_vars
-        )
+    print(  # noqa: T201
+        generate_config_blocks(sso_directories, profile_template, regex_replacements, **extra_vars)
     )
 
 
